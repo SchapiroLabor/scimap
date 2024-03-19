@@ -1,5 +1,4 @@
 # Import build-in libraries
-from pathlib import Path
 import argparse
 
 # Import external libraries
@@ -9,9 +8,10 @@ import scimap as sm
 import pandas as pd
 import plotly.express as px
 import matplotlib.pyplot as plt
-import seaborn as sns;
+import seaborn as sns
+import os
 
-sns.set(color_codes=True)
+sns.set(color_codes=True, style="white")
 
 # Gets arguments from the command line
 def get_args():
@@ -21,9 +21,8 @@ def get_args():
 
     # Add input arguments
     inputs_arguments = parser.add_argument_group(title='Input', description='Input arguments to run spatial_interaction')
-    inputs_arguments.add_argument("-i", "--input", dest="input", required=True,
-                                type=str, action="store",
-                                help="Input file for spatialLDA it can be a h5ad file or a csv file")
+    inputs_arguments.add_argument("-i", "--input", dest="input", required=True, action="store",
+                                help="path to dir with files for spatialLDA it can be a h5ad file or a csv file")
 
     # Add module arguments
     module_arguments = parser.add_argument_group(title='SpatialInteraction',
@@ -59,7 +58,7 @@ def get_args():
                                 type=int, action="store", default=1000,
                                 help="Number of permutations for p-value calculation")
     module_arguments.add_argument("-pm", "--pval_method", dest="pval_method", required=False,
-                                type=str, action="store", default='zscore', choices=["abs", "zscore"]
+                                type=str, action="store", default='zscore', choices=["abs", "zscore"],
                                 help="Method for p-value calculation:")
     
     # verbose and label arguments not added
@@ -81,18 +80,42 @@ def get_args():
     args = parser.parse_args()
 
     # Standardize paths
-    args.input = Path(args.input).resolve()
-    args.output = Path(args.output).resolve()
-    args.ncp = Path(args.icp).resolve() if args.icp else None
+    args.input  = os.path.abspath(args.input)
+    args.output = os.path.abspath(args.output)
+    args.icp    = os.path.abspath(args.icp) if args.icp else None
 
     return args
 
 def main():
     # Get arguments
     args = get_args()
+
+    list_of_files = os.listdir(args.input)
+    full_paths = [os.path.join(args.input, file) for file in list_of_files]
+
+    if list_of_files[0].endswith('.csv'):
+
+        adata = sm.pp.mcmicro_to_scimap(
+            feature_table_path=full_paths,
+            remove_dna=True,
+            remove_string_from_name=None,
+            log=False, #not default
+            drop_markers=None,
+            random_sample=None,
+            unique_CellId=True,
+            CellId='CellID',
+            split='X_centroid',
+            custom_imageid=None,
+            min_cells=None,
+            output_dir=None)
+
+    elif list_of_files[0].endswith('.h5ad'):
+        adata = anndata.read_h5ad(list_of_files[0])
+    # TODO has to be tested with anndata saved file
+    
     #run spatial_interaction
-    spatial_interaction(
-        adata       = args.input, 
+    sm.tl.spatial_interaction(
+        adata       = adata, 
         x_coordinate= args.x, 
         y_coordinate= args.y, 
         z_coordinate= args.z, 
@@ -103,8 +126,7 @@ def main():
         permutation = args.permutation, 
         imageid     = args.sampleid, 
         subset      = args.subset, 
-        pval_method = args.pval_method, 
-        verbose     = True, 
+        pval_method = args.pval_method,
         label       = 'spatial_interaction'
         )
 
@@ -112,7 +134,8 @@ def main():
     adata.write(filename=args.output, compression=None, compression_opts=None, as_dense=())
     
     #save the plot
-    seaborn_figure = sm.pl.spatial_interaction(
+    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+    ax = sm.pl.spatial_interaction(
                         adata=adata, 
                         spatial_interaction='spatial_interaction', 
                         summarize_plot=True, 
@@ -125,11 +148,14 @@ def main():
                         subset_neighbour_phenotype=None, 
                         binary_view=False, 
                         return_data=False)
-        
-    seaborn_figure.savefig(args.icp, format='png', dpi=300)
+    
+    plt.savefig(args.icp, format='png', dpi=300)
 
-        
+if __name__ == "__main__":
+    main()
 
-        
 
-        
+"""
+Example of usage:
+python spatial_interaction.py -i /path/to/input.h5ad -o /path/to/output.h5ad -icp /path/to/interaction_composition_plot.png
+"""
