@@ -68,7 +68,7 @@ def get_args():
                                   help="Output file for the motif locations plot")
 
     # Add version
-    parser.add_argument("--version", action="version", version="1.3.3")
+    parser.add_argument("-v", "--version", action="version", version="1.3.3")
 
     # Parse arguments
     args = parser.parse_args()
