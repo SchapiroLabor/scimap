@@ -9,10 +9,7 @@ import scimap as sm
 import pandas as pd
 import plotly.express as px
 import matplotlib.pyplot as plt
-import seaborn as sns;
-
-sns.set(color_codes=True)
-
+import seaborn as sns
 
 # Gets arguments from the command line
 def get_args():
